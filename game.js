@@ -23,7 +23,7 @@ const SYMBOL_IMAGES = {
   '🍓': 'assets/Strawberry.png',
   '🍑': 'assets/apple.png',
   '🍍': 'assets/pinapple.png',
-  '🤴': 'assets/scatter.png',
+  '🤴': 'assets/Scatter.png',
 };
 
 // Sets a tile's visual — image if available, emoji text as fallback
