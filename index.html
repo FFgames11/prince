@@ -145,24 +145,28 @@
 <div class="game-wrapper">
   <div class="title-banner">PRINCE FRUIT BONANZA</div>
   <div class="top-row">
-    <button class="info-btn" id="paytableOpenBtn">i</button>
-    <div class="balance-pill"><span class="lbl">BALANCE</span><span id="balanceDisplay">$5000.00</span></div>
+    <div class="top-left">
+      <button class="info-btn" id="paytableOpenBtn">i</button>
+      <div class="balance-pill"><span class="lbl">BALANCE</span><span id="balanceDisplay">$5000.00</span></div>
+    </div>
     <button class="buy-fs-btn" id="buyFsBtn">🤴 BUY SPINS</button>
-    <button class="auto-spin-btn" id="autoSpinBtn">🔁 AUTO</button>
   </div>
   <div class="temple-frame"><div class="reel-grid" id="grid"></div></div>
-  <div class="info-bar">
+  <div class="bottom-bar">
+    <div class="booster-wrap" id="boosterWrap">
+      <span class="booster-label-txt">BOOST</span>
+      <button class="boost-toggle" id="boosterBtn" title="Boosted scatter chance!">
+        <span class="boost-toggle-knob"></span>
+      </button>
+    </div>
     <div class="info-box"><div class="info-label">Total Win</div><div class="info-value total-win" id="winDisplay">$0.00</div></div>
-  </div>
-  <div class="controls">
-    <button class="btn btn-bet" id="betDecBtn">−</button>
-    <div class="bet-display">BET: $<span id="betDisplay">10</span></div>
-    <button class="btn btn-bet" id="betIncBtn">+</button>
-    <button class="spin-btn" id="spinBtn">SPIN ⚡</button>
-    <button class="booster-btn" id="boosterBtn" title="Boosted scatter chance!">
-      <span class="boost-icon">🚀</span>
-      <span class="boost-label">BOOST</span>
-    </button>
+    <button class="spin-btn" id="spinBtn">SPIN</button>
+    <div class="bet-group">
+      <button class="btn btn-bet" id="betDecBtn">−</button>
+      <button class="bet-display" id="betDisplay">BET: $<span id="betAmount">10</span></button>
+      <button class="btn btn-bet" id="betIncBtn">+</button>
+    </div>
+    <button class="auto-spin-btn" id="autoSpinBtn">🔁 AUTO</button>
   </div>
 </div>
 <img src="assets/prince.png" alt="Prince" class="game-prince">
@@ -233,6 +237,18 @@
   <span class="auto-spin-hud-count" id="autoSpinCount">0</span>
   <button class="auto-spin-hud-stop" id="autoSpinStopBtn">■ STOP</button>
 </div>
+</div>
+
+<div class="bet-settings-overlay" id="betSettingsModal">
+  <div class="bet-settings-box">
+    <div class="bet-settings-header">
+      <span class="bet-settings-title">Bet Settings</span>
+      <button class="bet-settings-close" id="betSettingsClose">✕</button>
+    </div>
+    <div class="bet-settings-grid" id="betSettingsGrid"></div>
+    <div class="bet-settings-note" id="betSettingsNote"></div>
+    <button class="bet-settings-accept" id="betSettingsAccept">Accept</button>
+  </div>
 </div>
 
 <script src="game.js"></script>

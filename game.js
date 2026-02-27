@@ -295,7 +295,7 @@ class UIManager {
   constructor() {
     this.els = {
       balance: $('balanceDisplay'),
-      bet: $('betDisplay'),
+      bet: $('betAmount'),
       win: $('winDisplay'),
       winMessage: $('winMessage'),
       winText: $('winText'),
@@ -348,6 +348,42 @@ class UIManager {
     const m = this.els.winMessage;
     m.classList.add('show');
     setTimeout(() => m.classList.remove('show'), 2000);
+  }
+
+  // Animated counting win overlay for Big Win / Mega Win
+  showBigWinCounting(amount, isMega) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'bigwin-overlay';
+      overlay.innerHTML = `
+        <div class="bigwin-box ${isMega ? 'megawin' : ''}">
+          <div class="bigwin-label">${isMega ? '🏆 MEGA WIN!' : '✨ BIG WIN!'}</div>
+          <div class="bigwin-amount">$<span class="bigwin-num">0</span></div>
+          <div class="bigwin-shine"></div>
+        </div>`;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('show'));
+
+      const numEl = overlay.querySelector('.bigwin-num');
+      const duration = 1800;
+      let start = null;
+      const tick = ts => {
+        if (!start) start = ts;
+        const p = Math.min((ts - start) / duration, 1);
+        // Ease out expo
+        const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
+        numEl.textContent = (amount * eased).toFixed(2);
+        if (p < 1) { requestAnimationFrame(tick); }
+        else {
+          numEl.textContent = amount.toFixed(2);
+          setTimeout(() => {
+            overlay.classList.remove('show');
+            setTimeout(() => { overlay.remove(); resolve(); }, 400);
+          }, 800);
+        }
+      };
+      requestAnimationFrame(tick);
+    });
   }
 
   updateBuyModal(bet, fsMult, balance) {
@@ -443,18 +479,21 @@ class Evaluator {
       if (state.inFreeSpins) state.freeSpinTotalWin += totalWin;
       ui.updateBalance(state.balance);
       ui.updateWinDisplay(totalWin);
+      const isMega = totalWin >= state.bet * 20;
       const isBigWin = totalWin >= state.bet * 10;
       if (!triggered) {
-        const winLabel = totalWin >= state.bet * 20
-          ? `🏆 MEGA WIN! $${totalWin.toFixed(0)}`
-          : isBigWin
-          ? `✨ BIG WIN! $${totalWin.toFixed(0)}`
-          : `💰 WIN! $${totalWin.toFixed(0)}`;
-        ui.showWinMessage(winLabel);
+        if (isBigWin) {
+          particles.spawn(true);
+          await ui.showBigWinCounting(totalWin, isMega);
+        } else {
+          ui.showWinMessage(`💰 WIN! $${totalWin.toFixed(0)}`);
+          particles.spawn(false);
+        }
+      } else {
+        particles.spawn(isBigWin);
       }
-      particles.spawn(isBigWin);
-      // Idle 2 seconds on Big Win or higher so the player can savour it
-      if (isBigWin) await delay(2000);
+      // Extra idle after big win overlay closes
+      if (isBigWin) await delay(300);
     }
 
     return triggered;
@@ -596,15 +635,13 @@ class Booster {
     } else {
       this.state.bet = Math.max(10, this.state.bet - 10);
     }
-    $('betDisplay').textContent = this.state.bet;
+    $('betAmount').textContent = this.state.bet;
     this.updateUI();
   }
 
   updateUI() {
     const active = this.state.boosted;
     this.btn.classList.toggle('active', active);
-    this.btn.querySelector('.boost-label').textContent = active ? 'ON 20%' : 'BOOST';
-    this.btn.querySelector('.boost-icon').textContent = active ? '🔥' : '🚀';
     $('buyFsBtn').disabled = active;
   }
 
@@ -712,6 +749,66 @@ class AutoSpin {
 }
 
 // ─────────────────────────────────────────────
+// CLASS: BetSettingsModal
+// Preset bet selector modal triggered by clicking bet display
+// ─────────────────────────────────────────────
+class BetSettingsModal {
+  constructor(state, ui) {
+    this.state = state;
+    this.ui = ui;
+    this.selected = state.bet;
+    this.presets = [10, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200];
+
+    this._buildGrid();
+    $('betSettingsClose').addEventListener('click', () => this.close());
+    $('betSettingsAccept').addEventListener('click', () => this.accept());
+    $('betSettingsModal').addEventListener('click', e => {
+      if (e.target === $('betSettingsModal')) this.close();
+    });
+  }
+
+  _buildGrid() {
+    const grid = $('betSettingsGrid');
+    grid.innerHTML = '';
+    this.presets.forEach(val => {
+      const btn = document.createElement('button');
+      btn.className = 'bet-preset-btn' + (val === this.selected ? ' selected' : '');
+      btn.textContent = val.toFixed(2);
+      btn.addEventListener('click', () => {
+        this.selected = val;
+        grid.querySelectorAll('.bet-preset-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this._updateNote();
+      });
+      grid.appendChild(btn);
+    });
+    this._updateNote();
+  }
+
+  _updateNote() {
+    const maxWin = this.selected * 500;
+    $('betSettingsNote').textContent = `The maximum win is ${maxWin.toLocaleString()}.00$ for a bet of ${this.selected.toFixed(2)}$.`;
+  }
+
+  open() {
+    if (this.state.spinning || this.state.inFreeSpins) return;
+    this.selected = this.state.bet;
+    this._buildGrid();
+    $('betSettingsModal').classList.add('open');
+  }
+
+  close() {
+    $('betSettingsModal').classList.remove('open');
+  }
+
+  accept() {
+    this.state.bet = this.selected;
+    this.ui.updateBet(this.state.bet);
+    this.close();
+  }
+}
+
+// ─────────────────────────────────────────────
 class Game {
   constructor() {
     this.generator = new SymbolGenerator(SYMBOLS, WEIGHTS, SCATTER);
@@ -723,6 +820,7 @@ class Game {
     this.booster = new Booster(this.state);
     this.autoSpin = new AutoSpin(this.state, this.ui, this);
     this.buyModal = new BuySpinsModal(this.ui, this.state, this);
+    this.betSettings = new BetSettingsModal(this.state, this.ui);
     this._bindControls();
   }
 
@@ -730,6 +828,7 @@ class Game {
     $('spinBtn').addEventListener('click', () => this.spin());
     $('betDecBtn').addEventListener('click', () => this.changeBet(-10));
     $('betIncBtn').addEventListener('click', () => this.changeBet(10));
+    $('betDisplay').addEventListener('click', () => this.betSettings.open());
     $('paytableOpenBtn').addEventListener('click', () => $('paytable').classList.add('open'));
     $('paytableCloseBtn').addEventListener('click', () => $('paytable').classList.remove('open'));
     $('playBtn').addEventListener('click', () => this.startGame());
@@ -836,18 +935,24 @@ class Game {
       milestoneTriggered = true;
     }
 
+    if (milestoneTriggered) {
+      // Skip normal spin — go straight to 4-scatter reveal like buying free spins
+      this.ui.updateWinDisplay(0);
+      this.grid.clearWins();
+      state.spinning = false;
+      await this._runBuyRevealSpin();
+      await this.startFreeSpins();
+      return;
+    }
+
     const triggered = await this._runSpin(false);
     state.spinning = false;
-    if (triggered || milestoneTriggered) {
-      if (milestoneTriggered && !triggered) {
-        this.ui.showWinMessage('🎰 SPIN #' + state.spinCount + ' BONUS — 10 FREE SPINS! 🎰');
-        await delay(1800);
-      }
+    if (triggered) {
       await this.startFreeSpins();
     }
     else {
       if (state.balance < state.bet) ui.setSpinButton(false, 'NO FUNDS');
-      else ui.setSpinButton(true, 'SPIN ⚡');
+      else ui.setSpinButton(true, 'SPIN');
     }
   }
 
@@ -870,7 +975,7 @@ class Game {
     await ui.showOverlay('fsSummaryOverlay', 3000, true, this.particles);
     state.inFreeSpins = false;
     if (state.balance < state.bet) ui.setSpinButton(false, 'NO FUNDS');
-    else ui.setSpinButton(true, 'SPIN ⚡');
+    else ui.setSpinButton(true, 'SPIN');
     ui.updateBalance(state.balance);
   }
 }
